@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 
-data = pd.read_csv('creditcard.csv')
+data = pd.read_csv('/Users/zhaojianbo/Desktop/creditcard.csv')
 
 
 ##print(data.head())
@@ -33,3 +33,20 @@ print("Accuracy:", accuracy)
 conf_matrix = confusion_matrix(test_y, predictions_binary)
 print("Confusion Matrix:")
 print(conf_matrix)
+
+
+## 感知机
+from sklearn.linear_model import Perceptron
+
+ppn = Perceptron(tol=1e-3, random_state=0)
+
+ppn.fit(X, y)
+
+##print("权重:", ppn.coef_)
+##print("偏置:", ppn.intercept_)
+
+predictions = ppn.predict(X)
+print("预测:", predictions)
+print("accuracy:", accuracy_score(y, ppn.predict(X)))
+
+## Nerual
