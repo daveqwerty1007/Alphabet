@@ -21,7 +21,7 @@ plt.title('Ripley’s K Function for Drinking Water in California')
 plt.show()
 
 
-# HTML map
+# Map
 overpass_url = "http://overpass-api.de/api/interpreter"
 overpass_query = """
 [out:json];
@@ -45,5 +45,4 @@ for idx, element in enumerate(data_water['elements']):
         name = element['tags'].get('name', 'No Name')
         folium.Marker(location=[lat, lon], popup=name, icon=folium.Icon(color='blue', icon='tint')).add_to(m)
 
-# Save the map
 m.save('drinking_water_map.html')
