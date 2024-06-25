@@ -19,6 +19,7 @@ def ripley_k_function(points, distances):
     
     return k_values
 
+"""
 def ripley_k_function(points, distances):
     n = len(points)
     x_min, x_max = points[:, 0].min(), points[:, 0].max()
@@ -34,18 +35,20 @@ def ripley_k_function(points, distances):
         k_values[idx] = (area / (n**2)) * count
     
     return k_values
-
+"""
 
 # dataset
 # location information in the map of Santa Clara County.
 # Sources: California Department Of Education (2021).
 # https://data.sccgov.org/Government/Point-Of-Interest/asae-p5kt/about_data
 
-#file_path = 'Point_Of_Interest_20240616.csv'
-#df = pd.read_csv(file_path)
+"""
+file_path = 'Point_Of_Interest_20240616.csv'
+df = pd.read_csv(file_path)
 
-#df = df.head(100)
-#print(df.head())
+df = df.head(100)
+print(df.head())
+"""
 
 # Overpass API
 overpass_url = "http://overpass-api.de/api/interpreter"
