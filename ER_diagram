@@ -1,0 +1,62 @@
+digraph {
+	KpopGroup [label="KpopGroup
+GroupID (PK)
+GroupName" shape=box]
+	Delivery [label="Delivery
+DeliveryID (PK)
+DeliveryMethod
+Cost" shape=box]
+	Branch [label="Branch
+BranchID (PK)" shape=box]
+	Warehouse [label="Warehouse
+WarehouseID (PK)
+WarehouseLocation
+ProductName
+NumberInStock" shape=box]
+	Customer [label="Customer
+CustomerID (PK)
+Name
+Email
+PhoneNumber
+Address" shape=box]
+	Product [label="Product
+ProductID (PK)
+ProductName
+SellingPrice
+GroupID (FK)" shape=box]
+	OrderDetail [label="OrderDetail
+OrderID (PK)
+OrderNumber
+ProductID (FK)
+NumberOfItems
+Price
+Branch
+Date
+Time
+EmployeeID (FK)
+CustomerID (FK)
+Status" shape=box]
+	Employee [label="Employee
+EmployeeID (PK)
+Name
+KPI
+Warehouse" shape=box]
+	Shipping [label="Shipping
+ShippingNumber (PK)
+OrderID (FK)
+ProductID (FK)
+NumberOfItems
+Origin
+Destination
+EmployeeID (FK)
+CustomerID (FK)
+Status" shape=box]
+	Product -> KpopGroup [label="FK: GroupID"]
+	OrderDetail -> Product [label="FK: ProductID"]
+	OrderDetail -> Employee [label="FK: EmployeeID"]
+	OrderDetail -> Customer [label="FK: CustomerID"]
+	Shipping -> OrderDetail [label="FK: OrderID"]
+	Shipping -> Product [label="FK: ProductID"]
+	Shipping -> Employee [label="FK: EmployeeID"]
+	Shipping -> Customer [label="FK: CustomerID"]
+}
