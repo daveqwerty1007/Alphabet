@@ -8,14 +8,7 @@ import matplotlib.pyplot as plt
 # see the week3-4_RKFunction.pdf
 
 # realization of Ripley’s K Function 
-"""
-def ripley_k_function(points, distances):
-    
-    
-    
-    return k_values
 
-"""
 def ripley_k_function(points, distances):
     n = len(points)
     area = (max(points[:, 0]) - min(points[:, 0])) * (max(points[:, 1]) - min(points[:, 1])) / 2 # southwest of cali is just water 
