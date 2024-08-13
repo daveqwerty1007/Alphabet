@@ -1,22 +1,102 @@
 import numpy as np
 import requests
+import json
 import itertools
-import folium
+import heapq
+import matplotlib.pyplot as plt
 
-def fetch_location_data(location_type, area="California"):
-    overpass_url = "http://overpass-api.de/api/interpreter"
-    overpass_query = f"""
-    [out:json];
-    area["ISO3166-2"="US-CA"];
-    (
-      node["{location_type}"](area);
-      way["{location_type}"](area);
-      rel["{location_type}"](area);
-    );
-    out center;
-    """
+
+overpass_url = "http://overpass-api.de/api/interpreter"
+
+def query_osm(overpass_query):
     response = requests.get(overpass_url, params={'data': overpass_query})
-    return response.json()['elements']
+    return response.json()
+
+# malls
+mall_query = """
+[out:json];
+area["ISO3166-2"="US-CA"];
+(
+  node["shop"="mall"](area);
+  way["shop"="mall"](area);
+  rel["shop"="mall"](area);
+);
+out center;
+"""
+data_mall = query_osm(mall_query)
+
+# fitting rooms
+fitting_query = """
+[out:json];
+area["ISO3166-2"="US-CA"];
+(node["shop"="clothes"](area);
+ way["shop"="clothes"](area);
+ rel["shop"="clothes"](area);
+);
+out center;
+"""
+data_fitting = query_osm(fitting_query)
+
+# libraries
+library_query = """
+[out:json];
+area["ISO3166-2"="US-CA"];
+(node["amenity"="hospital"](area);
+ way["amenity"="hospital"](area);
+ rel["amenity"="hospital"](area);
+);
+out center;
+"""
+data_library = query_osm(library_query)
+
+# courts
+basketball_query = """
+[out:json];
+area["ISO3166-2"="US-CA"];
+(node["amenity"="school"]["name"~"High School"](area);
+  way["amenity"="school"]["name"~"High School"](area);
+  rel["amenity"="school"]["name"~"High School"](area);
+  
+  node["amenity"="college"](area);
+  way["amenity"="college"](area);
+  rel["amenity"="college"](area);
+
+  node["amenity"="university"](area);
+  way["amenity"="university"](area);
+  rel["amenity"="university"](area);
+);
+out center;
+"""
+data_basketball = query_osm(basketball_query)
+
+def extract_coordinates(json_data):
+    elements = json_data['elements']
+    coordinates = np.array([[element['lat'], element['lon']] for element in elements])
+    return coordinates
+
+def save_data(data, filename):
+    np.save(filename, data)
+
+fitting_coordinates = extract_coordinates(data_fitting)
+save_data(fitting_coordinates, "data_fitting.npy")
+
+mall_coordinates = extract_coordinates(data_mall)
+save_data(mall_coordinates, "data_mall.npy")
+
+basketball_coordinates = extract_coordinates(data_basketball)
+save_data(basketball_coordinates, "data_basketball.npy")
+
+library_coordinates = extract_coordinates(data_library)
+save_data(library_coordinates, "data_library.npy")
+
+data_basketball_1 = np.load("data_basketball.npy")
+data_library_1 = np.load("data_library.npy")
+data_mall_1 = np.load("data_mall.npy")
+data_fitting_1 = np.load("data_fitting.npy")
+
+data_combined = np.concatenate([data_basketball_1, data_library_1, data_mall_1, data_fitting_1], axis=0)
+
+save_data(data_combined, "data_combined.npy")
 
 def ripley_k(data, r):
     n = len(data)
@@ -24,102 +104,98 @@ def ripley_k(data, r):
     for i in range(n):
         for j, radius in enumerate(r):
             in_circle = np.linalg.norm(data[i] - data, axis=1) <= radius
-            k[j] += np.sum(in_circle) - 1  # Subtract 1 to exclude the point itself
+            k[j] += np.sum(in_circle)
     return k / n
 
-def calculate_k_values(locations, grid_size=(30, 60), radius_range=np.linspace(0, 35, 100)):
-    all_lats = [loc['lat'] for sublist in locations for loc in sublist]
-    all_lons = [loc['lon'] for sublist in locations for loc in sublist]
-    min_lat, max_lat = min(all_lats), max(all_lats)
-    min_lon, max_lon = min(all_lons), max(all_lons)
-    lat_step = (max_lat - min_lat) / grid_size[0]
-    lon_step = (max_lon - min_lon) / grid_size[1]
+r = np.linspace(0, 35, 100)
 
-    k_matrix = np.zeros((*grid_size, len(locations), len(radius_range)))
+k_basketball = ripley_k(data_basketball_1, r)
+k_library = ripley_k(data_library_1, r)
+k_mall = ripley_k(data_mall_1, r)
+k_fitting = ripley_k(data_fitting_1, r)
 
-    for k, func_locations in enumerate(locations):
-        data = np.array([(loc['lat'], loc['lon']) for loc in func_locations])
-        for loc in func_locations:
-            lat, lon = loc['lat'], loc['lon']
-            grid_x = int((lat - min_lat) / lat_step)
-            grid_y = int((lon - min_lon) / lon_step)
-            grid_x = min(grid_x, grid_size[0] - 1)
-            grid_y = min(grid_y, grid_size[1] - 1)
-            if data.shape[0] > 1:
-                k_values = ripley_k(data, radius_range)
-                k_matrix[grid_x, grid_y, k, :] = k_values
+k_csr = np.pi * r**2
 
-    return k_matrix
+# Calculate high and low boundaries for 95% confidence interval
+#upper_bound = poisson.ppf(0.975, mu=k_csr)
+#lower_bound = poisson.ppf(0.025, mu=k_csr)
 
-def determine_grid_bounds_and_steps(locations):
-    all_lats = [loc['lat'] for sublist in locations for loc in sublist]
-    all_lons = [loc['lon'] for sublist in locations for loc in sublist]
-    min_lat, max_lat = min(all_lats), max(all_lats)
-    min_lon, max_lon = min(all_lons), max(all_lons)
-    lat_step = (max_lat - min_lat) / 30
-    lon_step = (max_lon - min_lon) / 60
-    return min_lat, max_lat, min_lon, max_lon, lat_step, lon_step
+min_lat, max_lat = 32.5, 42.0
+min_lon, max_lon = -124.5, -114.0
 
-def find_optimal_path(locations, k_matrix, threshold):
-    combinations = list(itertools.product(*locations))
-    min_distance = float('inf')
-    best_path = None
+num_lat_squares = 30
+num_lon_squares = 60
 
-    def calculate_distance(loc1, loc2):
-        return np.linalg.norm(np.array([loc1['lat'], loc1['lon']]) - np.array([loc2['lat'], loc2['lon']]))
+lat_step = (max_lat - min_lat) / num_lat_squares
+lon_step = (max_lon - min_lon) / num_lon_squares
 
-    for comb in combinations:
-        valid = True
-        total_distance = 0
-        for i in range(len(comb) - 1):
-            distance = calculate_distance(comb[i], comb[i + 1])
-            total_distance += distance
-            if distance < threshold:
-                valid = False
-                break
-        if valid and total_distance < min_distance:
-            min_distance = total_distance
-            best_path = comb
+k_matrix = np.zeros((num_lat_squares, num_lon_squares, 4))
 
-    return best_path, min_distance
+def get_square(lat, lon, min_lat, min_lon, lat_step, lon_step):
+    lat_idx = int((lat - min_lat) / lat_step)
+    lon_idx = int((lon - min_lon) / lon_step)
+    return lat_idx, lon_idx
 
-def visualize_path(path):
-    if not path:
-        print("No path found.")
-        return
+def assign_k_values(data, k_values, k_index, k_matrix):
+    for (lat, lon), k_value in zip(data, k_values):
+        lat_idx, lon_idx = get_square(lat, lon, min_lat, min_lon, lat_step, lon_step)
+        k_matrix[lat_idx, lon_idx, k_index] += k_value
 
-    map_center = [(path[0]['lat'] + path[-1]['lat']) / 2, (path[0]['lon'] + path[-1]['lon']) / 2]
-    m = folium.Map(location=map_center, zoom_start=8)
+assign_k_values(data_mall_1, k_mall, 0, k_matrix)
+assign_k_values(data_library_1, k_library, 1, k_matrix)
+assign_k_values(data_fitting_1, k_fitting, 2, k_matrix)
+assign_k_values(data_basketball_1, k_basketball, 3, k_matrix)
+
+def determine_threshold(k_matrix):
+    k_values = k_matrix.flatten()
+    mean_k = np.mean(k_values)
+    std_k = np.std(k_values)
+    threshold = mean_k + std_k
+    return threshold
+
+threshold = determine_threshold(k_matrix)
+
+def heuristic(current, goal):
+    return abs(current[0] - goal[0]) + abs(current[1] - goal[1])
+
+# A* Search 
+def a_star_search(start, goals, k_matrix, min_lat, min_lon, lat_step, lon_step, threshold):
+    open_set = []
+    heapq.heappush(open_set, (0, start, [])) 
     
-    for loc in path:
-        folium.Marker([loc['lat'], loc['lon']], popup=loc.get('tags', {}).get('name', 'Unknown')).add_to(m)
-    
-    folium.PolyLine([(loc['lat'], loc['lon']) for loc in path], color="blue", weight=2.5, opacity=1).add_to(m)
-    
-    return m
+    visited = set()
 
-def main(location_types):
-    all_locations = []
-    for location_type in location_types:
-        locations = fetch_location_data(location_type)
-        all_locations.append(locations)
-    
-    global min_lat, max_lat, min_lon, max_lon, lat_step, lon_step
-    min_lat, max_lat, min_lon, max_lon, lat_step, lon_step = determine_grid_bounds_and_steps(all_locations)
-    k_matrix = calculate_k_values(all_locations)
+    while open_set:
+        current_cost, current_point, path = heapq.heappop(open_set)
 
-    threshold = 0.1 
-    best_path, total_distance = find_optimal_path(all_locations, k_matrix, threshold)
+        current_point_tuple = tuple(current_point)
+        if current_point_tuple in visited:
+            continue
 
-    print("Optimal Path:", best_path)
-    print("Total Distance:", total_distance)
-    print("K Value Matrix:", k_matrix)
+        visited.add(current_point_tuple)
+        path = path + [current_point_tuple]
 
-    # Visualize the path
-    m = visualize_path(best_path)
-    return m
+        if len(path) == len(goals) + 1:  # Start + all goals
+            return path, current_cost
+
+        for goal in goals:
+            goal_tuple = tuple(goal)
+            if goal_tuple not in path:
+                new_cost = current_cost +  heuristic(current_point, goal)
+                
+                lat_idx, lon_idx = get_square(goal[0], goal[1], min_lat, min_lon, lat_step, lon_step)
+                if np.all(k_matrix[lat_idx, lon_idx, :] >= threshold):
+                    estimated_cost = new_cost + heuristic(goal, goals[-1]) 
+                    heapq.heappush(open_set, (estimated_cost, goal, path))
+
+    return None, float('inf')
 
 
-if __name__ == "__main__":
-    m = main(["shop=mall", "amenity=library", "shop=clothes", "amenity=school"])
-    m.save('optimal_path.html')
+start_point = data_mall_1[0] 
+goal_points = [data_library_1[0], data_fitting_1[0], data_basketball_1[0]]  
+
+
+best_path, min_distance = a_star_search(start_point, goal_points, k_matrix, min_lat, min_lon, lat_step, lon_step, threshold)
+
+print("Best Path:", best_path)
+print("Minimum Distance:", min_distance)
