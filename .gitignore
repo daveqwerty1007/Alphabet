@@ -1,11 +1,3 @@
 __pycache__
 .DS_Store
-anime
-DASS
-creditcard.csv
-Point_Of_Interest_20240616.csv
-data_school.npy
-data_mall.npy
-data_fitting.npy
-data_hospital.npy
 venv
